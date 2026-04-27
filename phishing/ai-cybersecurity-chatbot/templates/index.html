@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Cybersecurity Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+
+    <div class="chat-container">
+        <header>
+            <h1>🔒 PHISH-CARNAGE AI</h1>
+            <span class="status-badge">Online</span>
+        </header>
+
+        <div id="chat-box" class="chat-box">
+            <div class="message bot-message">
+                Hello! I am your AI Cybersecurity Assistant.
+                <br><br>
+                - Ask me questions about security (e.g., "How to enable 2FA?").
+                - Paste your browsing history logs to check for risks.
+            </div>
+        </div>
+
+        <div class="input-area">
+            <textarea id="user-input" placeholder="Type a message or paste browsing logs..." rows="2"></textarea>
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        function appendMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('message');
+            msgDiv.classList.add(sender === 'user' ? 'user-message' : 'bot-message');
+
+            // Render Markdown for bot messages
+            if (sender === 'bot') {
+                msgDiv.innerHTML = marked.parse(text);
+            } else {
+                msgDiv.innerText = text;
+            }
+
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            appendMessage(text, 'user');
+            userInput.value = '';
+            userInput.style.height = 'auto'; // Reset height
+
+            // Show typing indicator?
+            const loadingDiv = document.createElement('div');
+            loadingDiv.classList.add('message', 'bot-message', 'loading');
+            loadingDiv.innerText = 'Analyzing...';
+            chatBox.appendChild(loadingDiv);
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+
+                const data = await response.json();
+                chatBox.removeChild(loadingDiv);
+
+                appendMessage(data.response, 'bot');
+
+            } catch (error) {
+                chatBox.removeChild(loadingDiv);
+                appendMessage("Error: Could not reach the server.", 'bot');
+                console.error(error);
+            }
+        }
+
+        // Auto-resize textarea
+        userInput.addEventListener('input', function () {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Enter to send (Shift+Enter for newline)
+        userInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phish Carnage — Risk Intelligence Dashboard</title>
+  <meta name="description" content="Real-time AI phishing attribution and URL risk intelligence system." />
+
+  <link rel="preconnect" href="https://api.fontshare.com" />
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700,900&f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" />
+
+  <!-- Three.js for aurora background -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    /* ═══════════════════════════════════════════════════════════
+       DESIGN TOKENS
+    ═══════════════════════════════════════════════════════════ */
+    :root, [data-theme="dark"] {
+      --text-xs:   clamp(0.72rem,  0.68rem + 0.2vw,  0.82rem);
+      --text-sm:   clamp(0.85rem,  0.8rem  + 0.3vw,  0.95rem);
+      --text-base: clamp(0.95rem,  0.9rem  + 0.25vw, 1.05rem);
+      --text-lg:   clamp(1.1rem,   1rem    + 0.75vw, 1.45rem);
+      --text-xl:   clamp(1.4rem,   1.1rem  + 1.5vw,  2.2rem);
+
+      --sp1:.25rem; --sp2:.5rem; --sp3:.75rem; --sp4:1rem;
+      --sp5:1.25rem; --sp6:1.5rem; --sp8:2rem; --sp10:2.5rem; --sp12:3rem;
+
+      --bg:       #0c1012;
+      --surface:  #131a1c;
+      --surface2: #192022;
+      --offset:   #111618;
+      --dyn:      #202829;
+      --div:      #1e2729;
+      --border:   #273133;
+
+      --text:        #dde8e9;
+      --text-muted:  #8fa4a6;
+      --text-faint:  #556365;
+      --text-inv:    #0c1012;
+
+      --primary:    #58c6ba;
+      --primary-hv: #78ddd2;
+      --primary-hl: rgba(88,198,186,.13);
+
+      --error:   #f26ab0;
+      --success: #6dc265;
+      --warning: #f0a158;
+      --blue:    #67a8ff;
+
+      --r-sm: .375rem; --r-md: .75rem; --r-lg: 1rem; --r-xl: 1.25rem; --r-full: 9999px;
+
+      --sh-sm: 0 1px 3px rgba(0,0,0,.3);
+      --sh-md: 0 10px 28px rgba(0,0,0,.4);
+      --sh-lg: 0 20px 56px rgba(0,0,0,.5);
+
+      --ease: 180ms cubic-bezier(.16,1,.3,1);
+
+      --font-display: 'General Sans','Inter',sans-serif;
+      --font-body:    'Satoshi','Inter',sans-serif;
+    }
+    [data-theme="light"] {
+      --bg:       #f4f3ef; --surface: #f8f7f4; --surface2: #fafaf8;
+      --offset:   #edecea; --dyn:     #e4e2de; --div:      #d9d7d2; --border:  #ccc9c3;
+      --text:     #221f18; --text-muted: #5e5b55; --text-faint: #928e87; --text-inv: #f8f7f4;
+      --primary:  #01696f; --primary-hv: #0a4d53; --primary-hl: rgba(1,105,111,.10);
+      --error:    #b02875; --success: #3d7120; --warning: #8a3d16; --blue: #005f92;
+      --sh-sm: 0 1px 2px rgba(16,18,20,.06); --sh-md: 0 10px 28px rgba(16,18,20,.10); --sh-lg: 0 20px 48px rgba(16,18,20,.14);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       RESET + BASE
+    ═══════════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: var(--font-body); font-size: var(--text-base);
+      line-height: 1.6; color: var(--text);
+      background:
+        radial-gradient(circle at 78% 8%,  rgba(88,198,186,.09), transparent 26%),
+        radial-gradient(circle at 12% 88%, rgba(103,168,255,.07), transparent 20%),
+        var(--bg);
+      overflow-x: hidden;
+    }
+    img, svg { display: block; max-width: 100%; }
+    button, input, textarea, select { font: inherit; color: inherit; }
+    button { border: none; cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+    :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; border-radius: var(--r-sm); }
+
+    /* ═══════════════════════════════════════════════════════════
+       LAYOUT SHELL
+    ═══════════════════════════════════════════════════════════ */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 268px 1fr;
+      grid-template-rows: 68px 1fr;
+      height: 100dvh;
+    }
+
+    /* ── Sidebar ────────────────────────────────────────────── */
+    .sidebar {
+      grid-row: 1 / -1;
+      background: color-mix(in srgb, var(--surface), transparent 3%);
+      border-right: 1px solid rgba(255,255,255,.05);
+      padding: var(--sp6);
+      overflow-y: auto;
+      backdrop-filter: blur(20px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top header ─────────────────────────────────────────── */
+    .topbar {
+      grid-column: 2;
+      display: flex; align-items: center; justify-content: space-between; gap: var(--sp4);
+      padding: 0 var(--sp6);
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      background: rgba(12,16,18,.82);
+      backdrop-filter: blur(20px);
+      position: sticky; top: 0; z-index: 20;
+    }
+
+    /* ── Scrollable main ────────────────────────────────────── */
+    .main {
+      grid-column: 2;
+      overflow-y: auto;
+      padding: var(--sp6);
+      display: grid;
+      gap: var(--sp6);
+      align-content: start;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       SIDEBAR INTERNALS
+    ═══════════════════════════════════════════════════════════ */
+    .brand {
+      display: flex; align-items: center; gap: var(--sp3);
+      margin-bottom: var(--sp8);
+    }
+    .brand-mark {
+      width: 40px; height: 40px; flex-shrink: 0;
+      display: grid; place-items: center; border-radius: 13px;
+      background: linear-gradient(145deg, rgba(88,198,186,.18), rgba(88,198,186,.04));
+      border: 1px solid rgba(88,198,186,.26);
+      color: var(--primary);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.07), var(--sh-sm);
+    }
+    .brand h1 {
+      font-family: var(--font-display); font-size: var(--text-lg);
+      line-height: 1.1; letter-spacing: -.03em;
+    }
+    .brand p { font-size: var(--text-xs); color: var(--text-muted); margin-top: 1px; }
+
+    .nav-label {
+      font-size: var(--text-xs); text-transform: uppercase;
+      letter-spacing: .18em; color: var(--text-faint);
+      margin: var(--sp4) 0 var(--sp2);
+    }
+    .nav-group { display: grid; gap: var(--sp1); }
+    .nav-item {
+      display: flex; align-items: center; gap: var(--sp3);
+      padding: .78rem .9rem; border-radius: var(--r-md);
+      color: var(--text-muted); transition: all var(--ease);
+      font-size: var(--text-sm); font-weight: 500;
+    }
+    .nav-item:hover, .nav-item.active {
+      background: var(--primary-hl); color: var(--text);
+      transform: translateX(2px);
+    }
+    .nav-item.active { color: var(--primary); }
+    .nav-icon { width: 17px; height: 17px; flex-shrink: 0; opacity: .85; }
+
+    .sidebar-footer {
+      margin-top: auto; padding-top: var(--sp6);
+    }
+    .status-card {
+      background: linear-gradient(160deg, rgba(88,198,186,.11), rgba(88,198,186,.03));
+      border: 1px solid rgba(88,198,186,.18);
+      border-radius: var(--r-lg); padding: var(--sp5);
+    }
+    .status-card .eyebrow { font-size: var(--text-xs); letter-spacing: .14em; text-transform: uppercase; color: var(--primary); margin-bottom: var(--sp2); }
+    .status-card strong { font-family: var(--font-display); font-size: var(--text-lg); display: block; }
+    .status-card p { font-size: var(--text-xs); color: var(--text-muted); margin-top: var(--sp2); line-height: 1.5; }
+
+    /* ═══════════════════════════════════════════════════════════
+       TOPBAR INTERNALS
+    ═══════════════════════════════════════════════════════════ */
+    .search {
+      flex: 1; max-width: 480px;
+      display: flex; align-items: center; gap: var(--sp3);
+      background: var(--surface); border: 1px solid rgba(255,255,255,.05);
+      border-radius: var(--r-full); padding: .72rem 1rem;
+      box-shadow: var(--sh-sm);
+    }
+    .search input { flex: 1; background: transparent; border: 0; outline: 0; font-size: var(--text-sm); }
+
+    .top-actions { display: flex; align-items: center; gap: var(--sp3); }
+    .icon-btn {
+      min-width: 42px; min-height: 42px; border-radius: 12px;
+      background: var(--surface); border: 1px solid rgba(255,255,255,.05);
+      display: grid; place-items: center; box-shadow: var(--sh-sm);
+      color: var(--text-muted); transition: all var(--ease);
+    }
+    .icon-btn:hover { color: var(--text); border-color: var(--primary); }
+
+    /* ═══════════════════════════════════════════════════════════
+       SHARED PANEL
+    ═══════════════════════════════════════════════════════════ */
+    .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.008));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: var(--r-xl);
+      padding: var(--sp6);
+      box-shadow: var(--sh-md);
+    }
+    .eyebrow {
+      font-size: var(--text-xs); letter-spacing: .15em; text-transform: uppercase;
+      color: var(--primary); margin-bottom: var(--sp3);
+    }
+    .section-head {
+      display: flex; align-items: center; justify-content: space-between; gap: var(--sp4);
+      margin-bottom: var(--sp5);
+    }
+    .section-head h3 { font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: -.03em; }
+
+    /* ═══════════════════════════════════════════════════════════
+       HERO GRID
+    ═══════════════════════════════════════════════════════════ */
+    .hero { display: grid; grid-template-columns: 1.4fr .85fr; gap: var(--sp6); }
+
+    .hero-card {
+      position: relative; overflow: hidden;
+      background:
+        radial-gradient(circle at top right, rgba(88,198,186,.14), transparent 30%),
+        linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01));
+    }
+    .hero-card h2 {
+      font-family: var(--font-display); font-size: var(--text-xl);
+      line-height: 1.06; letter-spacing: -.04em; max-width: 16ch;
+    }
+    .hero-card > p { color: var(--text-muted); margin-top: var(--sp4); max-width: 55ch; }
+    .hero-actions { display: flex; gap: var(--sp3); margin-top: var(--sp6); flex-wrap: wrap; }
+
+    .btn {
+      min-height: 44px; padding: .75rem 1.2rem;
+      border-radius: var(--r-full); font-size: var(--text-sm); font-weight: 700;
+      transition: all var(--ease); display: inline-flex; align-items: center; gap: var(--sp2);
+    }
+    .btn-primary   { background: var(--primary); color: #000; }
+    .btn-primary:hover { background: var(--primary-hv); color: #000; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(88,198,186,.35); }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid rgba(255,255,255,.06); }
+    .btn-secondary:hover { background: var(--dyn); transform: translateY(-1px); }
+    .btn-danger    { background: rgba(242,106,176,.12); color: var(--error); border: 1px solid rgba(242,106,176,.22); }
+    .btn-danger:hover  { background: rgba(242,106,176,.2); }
+
+    /* Risk ring */
+    .risk-ring {
+      width: 160px; aspect-ratio: 1; margin-inline: auto; border-radius: 50%;
+      display: grid; place-items: center;
+      background: conic-gradient(
+        var(--error)    0%   calc(var(--pct, 82) * 1%),
+        rgba(255,255,255,.07) calc(var(--pct, 82) * 1%) 100%
+      );
+      position: relative;
+    }
+    .risk-ring::before {
+      content: ""; position: absolute; inset: 14px; border-radius: 50%;
+      background: var(--offset); border: 1px solid rgba(255,255,255,.05);
+    }
+    .risk-core { position: relative; text-align: center; z-index: 1; }
+    .risk-core strong { display: block; font-size: 2.2rem; font-family: var(--font-display); line-height: 1; }
+    .risk-core span { font-size: var(--text-sm); color: var(--text-muted); }
+
+    /* Badges */
+    .badge {
+      display: inline-flex; align-items: center; gap: var(--sp2);
+      border-radius: var(--r-full); padding: .38rem .8rem;
+      font-size: var(--text-xs); font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    }
+    .badge.high     { background: rgba(242,106,176,.12); color: var(--error); }
+    .badge.safe     { background: rgba(109,194,101,.12); color: var(--success); }
+    .badge.review   { background: rgba(240,161,88,.13);  color: var(--warning); }
+    .badge.medium   { background: rgba(240,161,88,.13);  color: var(--warning); }
+    .badge.low      { background: rgba(109,194,101,.12); color: var(--success); }
+    .badge.critical { background: rgba(242,106,176,.2);  color: var(--error); }
+
+    /* ═══════════════════════════════════════════════════════════
+       STATS ROW
+    ═══════════════════════════════════════════════════════════ */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp4); }
+    .stat-card {
+      background: var(--surface); border: 1px solid rgba(255,255,255,.05);
+      border-radius: var(--r-lg); padding: var(--sp5);
+      transition: border-color var(--ease), transform var(--ease);
+    }
+    .stat-card:hover { transform: translateY(-2px); border-color: rgba(88,198,186,.25); }
+    .stat-card small { display: block; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .14em; color: var(--text-faint); margin-bottom: var(--sp3); }
+    .stat-card strong { display: block; font-size: 1.9rem; font-family: var(--font-display); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+    .stat-meta { display: flex; align-items: center; gap: var(--sp2); color: var(--text-muted); font-size: var(--text-sm); margin-top: var(--sp2); }
+
+    /* ═══════════════════════════════════════════════════════════
+       CONTENT GRID (scan form + recent scans table)
+    ═══════════════════════════════════════════════════════════ */
+    .content-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: var(--sp6); align-items: start; }
+
+    /* ── Scan table ─────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%; border-collapse: collapse;
+      font-size: var(--text-sm);
+    }
+    thead tr { border-bottom: 1px solid var(--div); }
+    th {
+      text-align: left; padding: .6rem .8rem;
+      font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .12em;
+      color: var(--text-faint); font-weight: 600; white-space: nowrap;
+    }
+    td { padding: .7rem .8rem; vertical-align: middle; border-bottom: 1px solid rgba(255,255,255,.03); }
+    tbody tr { transition: background var(--ease); }
+    tbody tr:hover { background: rgba(255,255,255,.024); }
+    .url-cell { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: var(--text-xs); }
+
+    .level-badge {
+      display: inline-flex; align-items: center; padding: .25rem .65rem;
+      border-radius: var(--r-full); font-size: var(--text-xs); font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .level-low      { background: rgba(109,194,101,.12); color: var(--success); }
+    .level-medium   { background: rgba(240,161,88,.13);  color: var(--warning); }
+    .level-high     { background: rgba(242,106,176,.12); color: var(--error); }
+    .level-critical { background: rgba(242,106,176,.2);  color: var(--error); }
+
+    .btn-delete {
+      background: transparent; border: 1px solid rgba(242,106,176,.2);
+      color: var(--error); border-radius: var(--r-sm);
+      width: 28px; height: 28px; display: grid; place-items: center;
+      font-size: .9rem; transition: all var(--ease);
+    }
+    .btn-delete:hover { background: rgba(242,106,176,.14); }
+
+    /* ── URL scan form ──────────────────────────────────────── */
+    .scan-form-grid { display: grid; gap: var(--sp4); }
+    .field label { display: block; font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--sp2); color: var(--text-muted); }
+    .field input, .field textarea {
+      width: 100%;
+      background: var(--offset); border: 1px solid rgba(255,255,255,.07);
+      border-radius: var(--r-lg); padding: .85rem 1rem;
+      outline: 0; font-size: var(--text-sm); color: var(--text);
+      transition: border-color var(--ease);
+    }
+    .field input:focus, .field textarea:focus { border-color: rgba(88,198,186,.45); background: var(--surface2); }
+    .field textarea { min-height: 100px; resize: vertical; }
+
+    /* Detection cues checklist */
+    .checklist { display: grid; gap: 0; }
+    .check-item { display: flex; gap: var(--sp3); padding: var(--sp3) 0; border-bottom: 1px solid var(--div); }
+    .check-item:last-child { border-bottom: 0; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; margin-top: .45rem; flex-shrink: 0; }
+    .dot-primary { background: var(--primary); box-shadow: 0 0 0 5px rgba(88,198,186,.12); }
+    .dot-warning { background: var(--warning); box-shadow: 0 0 0 5px rgba(240,161,88,.12); }
+    .dot-error   { background: var(--error);   box-shadow: 0 0 0 5px rgba(242,106,176,.12); }
+
+    /* ═══════════════════════════════════════════════════════════
+       CHAT SECTION
+    ═══════════════════════════════════════════════════════════ */
+    .chat-panel {
+      display: grid; grid-template-rows: auto 1fr auto;
+      height: 440px;
+    }
+    .chat-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: var(--sp4); border-bottom: 1px solid var(--div);
+      margin-bottom: var(--sp4);
+    }
+    .chat-header h3 { font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: -.03em; }
+    .status-dot-wrap {
+      display: flex; align-items: center; gap: var(--sp2);
+      font-size: var(--text-xs); font-weight: 600; color: var(--success);
+    }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px rgba(109,194,101,.2); }
+
+    .chat-box {
+      overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp3);
+      padding-right: var(--sp2);
+      scrollbar-width: thin; scrollbar-color: var(--div) transparent;
+    }
+    .message {
+      padding: .7rem 1rem; border-radius: var(--r-lg);
+      font-size: var(--text-sm); line-height: 1.55; max-width: 88%;
+    }
+    .bot-message  { background: var(--surface2); align-self: flex-start; border: 1px solid rgba(255,255,255,.05); }
+    .user-message { background: var(--primary-hl); align-self: flex-end; border: 1px solid rgba(88,198,186,.2); }
+
+    .chat-input-area {
+      display: flex; gap: var(--sp3); align-items: flex-end;
+      padding-top: var(--sp4); border-top: 1px solid var(--div);
+    }
+    #user-input {
+      flex: 1; background: var(--offset); border: 1px solid rgba(255,255,255,.07);
+      border-radius: var(--r-lg); padding: .72rem 1rem;
+      resize: none; font-size: var(--text-sm); outline: 0;
+      transition: border-color var(--ease);
+      max-height: 120px;
+    }
+    #user-input:focus { border-color: rgba(88,198,186,.4); }
+    .voice-btn {
+      width: 42px; height: 42px; flex-shrink: 0;
+      border-radius: var(--r-full);
+      background: var(--surface); border: 1px solid rgba(255,255,255,.06);
+      display: grid; place-items: center; font-size: 1.1rem;
+      transition: all var(--ease);
+    }
+    .voice-btn:hover { background: var(--primary-hl); border-color: rgba(88,198,186,.3); }
+    #chat-send-btn {
+      height: 42px; padding: 0 1.1rem;
+      background: var(--primary); color: #000;
+      border-radius: var(--r-full); font-weight: 700; font-size: var(--text-sm);
+      transition: all var(--ease);
+    }
+    #chat-send-btn:hover { background: var(--primary-hv); transform: translateY(-1px); }
+
+    /* ═══════════════════════════════════════════════════════════
+       EXPORT + FOOTER
+    ═══════════════════════════════════════════════════════════ */
+    .export-row { display: flex; gap: var(--sp3); flex-wrap: wrap; }
+    .footer-note { font-size: var(--text-sm); color: var(--text-faint); text-align: center; padding: var(--sp4) 0; }
+
+    /* ═══════════════════════════════════════════════════════════
+       MOBILE TOPBAR
+    ═══════════════════════════════════════════════════════════ */
+    .mobile-topbar { display: none; }
+
+    /* ═══════════════════════════════════════════════════════════
+       RESPONSIVE
+    ═══════════════════════════════════════════════════════════ */
+    @media (max-width: 1100px) {
+      .dashboard { grid-template-columns: 88px 1fr; }
+      .brand-copy, .nav-item span, .nav-label { display: none; }
+      .brand { justify-content: center; margin-bottom: var(--sp6); }
+      .nav-item { justify-content: center; padding-inline: 0; }
+      .hero { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 860px) {
+      html, body { overflow: auto; height: auto; }
+      .dashboard { display: block; height: auto; }
+      .sidebar { display: none; }
+      .topbar { display: none; }
+      .mobile-topbar {
+        display: flex; align-items: center; justify-content: space-between; gap: var(--sp3);
+        padding: var(--sp4); position: sticky; top: 0; z-index: 30;
+        background: rgba(12,16,18,.9); backdrop-filter: blur(18px);
+        border-bottom: 1px solid rgba(255,255,255,.06);
+      }
+      .main { padding: var(--sp4); }
+      .hero, .content-grid, .stats { grid-template-columns: 1fr; }
+      .hero-card h2 { max-width: none; }
+      .chat-panel { height: 380px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Mobile topbar (< 860px) ──────────────────────────────────── -->
+<div class="mobile-topbar" role="banner">
+  <div class="brand" style="margin-bottom:0">
+    <div class="brand-mark" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M12 2 4 5v6c0 5.2 3.3 9.9 8 11 4.7-1.1 8-5.8 8-11V5l-8-3Z"/><path d="M9 12.5l2.1 2.1L15.5 10"/>
+      </svg>
+    </div>
+    <div class="brand-copy"><h1>Phish Carnage</h1></div>
+  </div>
+  <button class="icon-btn" id="themeToggleMobile" aria-label="Toggle theme"></button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     DASHBOARD SHELL
+══════════════════════════════════════════════════════════════════ -->
+<div class="dashboard">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────── -->
+  <aside class="sidebar" aria-label="Navigation">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M12 2 4 5v6c0 5.2 3.3 9.9 8 11 4.7-1.1 8-5.8 8-11V5l-8-3Z"/><path d="M9 12.5l2.1 2.1L15.5 10"/>
+        </svg>
+      </div>
+      <div class="brand-copy">
+        <h1>Phish Carnage</h1>
+        <p>Real-time AI Risk Intelligence</p>
+      </div>
+    </div>
+
+    <nav aria-label="Main navigation">
+      <div class="nav-label">Overview</div>
+      <div class="nav-group">
+        <a class="nav-item active" href="/" aria-current="page">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 13h8V3H3zm10 8h8v-6h-8zm0-10h8V3h-8zM3 21h8v-6H3z"/></svg>
+          <span>Dashboard</span>
+        </a>
+        <a class="nav-item" href="/history">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+          <span>Scan History</span>
+        </a>
+        <a class="nav-item" href="#url-scan">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M3 12h18"/></svg>
+          <span>URL Scanner</span>
+        </a>
+      </div>
+
+      <div class="nav-label">Actions</div>
+      <div class="nav-group">
+        <a class="nav-item" href="/export/csv">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          <span>Export CSV</span>
+        </a>
+        <a class="nav-item" href="/export/pdf">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>Export PDF</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="status-card">
+        <div class="eyebrow">System status</div>
+        <strong>Armed &amp; scanning</strong>
+        <p>Real-time URL analysis, kill-chain attribution, and AI assistant active.</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Topbar ──────────────────────────────────────────────── -->
+  <header class="topbar" role="banner">
+    <div class="search" role="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" placeholder="Search scans, domains, or risk levels…" aria-label="Search" />
+    </div>
+    <div class="top-actions">
+      <a href="/history" class="icon-btn" title="View all history" aria-label="Scan history">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+      </a>
+      <button class="icon-btn" id="themeToggle" aria-label="Toggle theme"></button>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════════
+       MAIN CONTENT
+  ═══════════════════════════════════════════════════════════ -->
+  <main class="main" id="main-content">
+
+    <!-- ── Hero ─────────────────────────────────────────────── -->
+    <section class="hero" aria-label="Overview">
+      <article class="panel hero-card">
+        <div class="eyebrow">Phishing Attribution System</div>
+        <h2>Detect threats before users ever click.</h2>
+        <p>Real-time AI-powered URL risk scoring, kill-chain attribution, and in-browser phishing detection — all in one intelligence dashboard.</p>
+        <div class="hero-actions">
+          <a href="#url-scan" class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+            Scan a URL now
+          </a>
+          <a href="/history" class="btn btn-secondary">View full history →</a>
+        </div>
+      </article>
+
+      <aside class="panel" aria-label="Threat posture">
+        <div class="section-head" style="margin-bottom:var(--sp5)">
+          <div>
+            <div class="eyebrow">Current threat posture</div>
+            <h3 style="font-family:var(--font-display)">Risk overview</h3>
+          </div>
+          {% set pct = (high_critical_scans / total_scans * 100) | int if total_scans > 0 else 0 %}
+          {% if pct >= 60 %}
+            <span class="badge high">High alert</span>
+          {% elif pct >= 25 %}
+            <span class="badge review">Caution</span>
+          {% else %}
+            <span class="badge safe">Secure</span>
+          {% endif %}
+        </div>
+
+        <div class="risk-ring" style="--pct: {{ pct }}">
+          <div class="risk-core">
+            <strong>{{ pct }}</strong>
+            <span>Threat %</span>
+          </div>
+        </div>
+        <p style="margin-top:var(--sp4);text-align:center;color:var(--text-muted);font-size:var(--text-sm)">
+          {{ high_critical_scans }} of {{ total_scans }} scans flagged as High or Critical risk.
+        </p>
+      </aside>
+    </section>
+
+    <!-- ── Stats row ─────────────────────────────────────────── -->
+    <section class="stats" aria-label="Statistics">
+      <article class="stat-card">
+        <small>Total Scans</small>
+        <strong>{{ total_scans }}</strong>
+        <div class="stat-meta"><span style="color:var(--primary)">All time</span></div>
+      </article>
+      <article class="stat-card">
+        <small>High / Critical</small>
+        <strong>{{ high_critical_scans }}</strong>
+        <div class="stat-meta">
+          {% if total_scans > 0 %}
+            <span style="color:var(--error)">{{ ((high_critical_scans / total_scans) * 100) | round(1) }}%</span>
+          {% else %}
+            <span style="color:var(--text-faint)">—</span>
+          {% endif %}
+          <span>of all scans</span>
+        </div>
+      </article>
+      <article class="stat-card">
+        <small>Safe Scans</small>
+        <strong>{{ total_scans - high_critical_scans }}</strong>
+        <div class="stat-meta"><span style="color:var(--success)">Low / Medium</span></div>
+      </article>
+      <article class="stat-card">
+        <small>Detection Engine</small>
+        <strong>v2.0</strong>
+        <div class="stat-meta"><span style="color:var(--blue)">12 rules</span><span>active</span></div>
+      </article>
+    </section>
+
+    <!-- ── Main content grid ──────────────────────────────────── -->
+    <section class="content-grid" aria-label="Scan details">
+
+      <!-- Recent scans table -->
+      <article class="panel">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Review queue</div>
+            <h3>Recent scan results</h3>
+          </div>
+          <form action="{{ url_for('clear_scans') }}" method="post"
+                onsubmit="return confirm('Delete ALL scan history?');">
+            <button type="submit" class="btn btn-danger" style="min-height:38px;padding:.5rem .9rem;font-size:var(--text-xs)">
+              Clear All
+            </button>
+          </form>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>URL</th>
+                <th>Score</th>
+                <th>Level</th>
+                <th>Timestamp</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for id, url, score, level, ts in recent_scans %}
+              <tr>
+                <td class="url-cell" title="{{ url }}">{{ url }}</td>
+                <td><strong style="font-variant-numeric:tabular-nums">{{ score }}</strong></td>
+                <td><span class="level-badge level-{{ level.lower() }}">{{ level }}</span></td>
+                <td style="color:var(--text-faint);font-size:var(--text-xs)">{{ ts }}</td>
+                <td>
+                  <form action="{{ url_for('delete_scan', scan_id=id) }}" method="post" style="display:inline">
+                    <button type="submit" class="btn-delete" title="Delete this scan">×</button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5" style="text-align:center;color:var(--text-faint);padding:2rem">
+                  No scans yet. Submit a URL below to start!
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Export buttons below table -->
+        <div class="export-row" style="margin-top:var(--sp5)">
+          <a href="/export/csv" class="btn btn-secondary" style="min-height:38px;padding:.5rem 1rem;font-size:var(--text-sm)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Export CSV
+          </a>
+          <a href="/export/pdf" class="btn btn-secondary" style="min-height:38px;padding:.5rem 1rem;font-size:var(--text-sm)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+            Export PDF
+          </a>
+        </div>
+      </article>
+
+      <!-- URL Scan form -->
+      <aside class="panel" id="url-scan">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">URL analyzer</div>
+            <h3>Quick phishing check</h3>
+          </div>
+        </div>
+
+        <form action="/scan" method="post" class="scan-form-grid">
+          <div class="field">
+            <label for="url-input">Enter URL to scan</label>
+            <input id="url-input" type="url" name="url"
+                   placeholder="https://suspicious-domain.example.com" required />
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+            Analyze URL
+          </button>
+        </form>
+
+        <div style="margin-top:var(--sp6)">
+          <div class="section-head" style="margin-bottom:var(--sp4)">
+            <div>
+              <div class="eyebrow">Detection signals</div>
+              <h3 style="font-size:var(--text-base)">What gets flagged</h3>
+            </div>
+          </div>
+          <div class="checklist">
+            <div class="check-item">
+              <span class="dot dot-primary"></span>
+              <div>
+                <strong style="font-size:var(--text-sm)">IP-based / Punycode URLs</strong>
+                <p style="font-size:var(--text-xs);color:var(--text-muted)">Raw IPs or IDN homograph attacks masking real domains.</p>
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="dot dot-warning"></span>
+              <div>
+                <strong style="font-size:var(--text-sm)">Brand + social engineering keywords</strong>
+                <p style="font-size:var(--text-xs);color:var(--text-muted)">Spoofed brand names paired with urgency language.</p>
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="dot dot-error"></span>
+              <div>
+                <strong style="font-size:var(--text-sm)">Suspicious TLDs &amp; URL shorteners</strong>
+                <p style="font-size:var(--text-xs);color:var(--text-muted)">High-risk domain endings and obfuscation via redirect services.</p>
+              </div>
+            </div>
+            <div class="check-item" style="border-bottom:0">
+              <span class="dot dot-primary" style="background:var(--blue);box-shadow:0 0 0 5px rgba(103,168,255,.12)"></span>
+              <div>
+                <strong style="font-size:var(--text-sm)">In-page content signals</strong>
+                <p style="font-size:var(--text-xs);color:var(--text-muted)">Password forms on HTTP, brand impersonation in page title, iframe overlays.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ── AI Chatbot ─────────────────────────────────────────── -->
+    <section aria-label="AI Security Assistant">
+      <article class="panel chat-panel">
+        <div class="chat-header">
+          <div>
+            <div class="eyebrow">AI-powered assistant</div>
+            <h3>CyberGuard AI</h3>
+          </div>
+          <div class="status-dot-wrap">
+            <div class="status-dot" aria-hidden="true"></div>
+            Online
+          </div>
+        </div>
+
+        <div id="chat-box" class="chat-box" role="log" aria-live="polite" aria-label="Chat messages">
+          <div class="message bot-message">
+            Hello! I'm CyberGuard AI. Ask me about phishing tactics, paste browsing history logs to analyze risks, or say <em>"Scan example.com"</em> to check a URL.
+          </div>
+        </div>
+
+        <div class="chat-input-area">
+          <button id="voice-btn" class="voice-btn" title="Click to speak" aria-label="Voice input">🎙️</button>
+          <textarea id="user-input" placeholder="Type a message or say 'Scan example.com'…" rows="1" aria-label="Message input"></textarea>
+          <button id="chat-send-btn" aria-label="Send message">Send</button>
+        </div>
+      </article>
+    </section>
+
+    <p class="footer-note">
+      Phish Carnage v2.0 — Real-time AI Risk Intelligence System
+      &middot; <a href="/history" style="color:var(--primary)">Full history →</a>
+    </p>
+
+  </main>
+</div><!-- /dashboard -->
+
+<!-- Aurora shader background (Three.js) -->
+<script src="{{ url_for('static', filename='background.js') }}" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="{{ url_for('static', filename='chat.js') }}"></script>
+
+<!-- Theme toggle -->
+<script>
+(function () {
+  const root    = document.documentElement;
+  const toggles = document.querySelectorAll('#themeToggle, #themeToggleMobile');
+  let theme = localStorage.getItem('pc-theme')
+    || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+  const moonSVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+  const sunSVG  = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`;
+
+  function apply() {
+    root.setAttribute('data-theme', theme);
+    toggles.forEach(b => {
+      b.innerHTML = theme === 'dark' ? moonSVG : sunSVG;
+      b.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+    });
+  }
+
+  apply();
+
+  toggles.forEach(btn => btn.addEventListener('click', () => {
+    theme = theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('pc-theme', theme);
+    apply();
+  }));
+}());
+</script>
+
+</body>
+</html>

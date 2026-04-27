@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Phish Carnage</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:        #0d1117;
+            --surface:   #161b22;
+            --border:    #21262d;
+            --muted:     #8b949e;
+            --text:      #e6edf3;
+            --accent:    #58a6ff;
+
+            --low:       #238636;
+            --low-bg:    #0d2818;
+            --low-text:  #3fb950;
+
+            --med:       #d29922;
+            --med-bg:    #272010;
+            --med-text:  #e3b341;
+
+            --high:      #da3633;
+            --high-bg:   #2d1117;
+            --high-text: #f85149;
+
+            --crit:      #9e1e1e;
+            --crit-bg:   #220a0a;
+            --crit-text: #ff7b72;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            width: 360px;
+            min-height: 200px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            font-size: 13px;
+        }
+
+        /* ── Header ────────────────────────────────────────── */
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px 12px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, #161b22 0%, #0d1117 100%);
+        }
+        .header-logo { font-size: 22px; line-height: 1; }
+        .header-title {
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            color: #fff;
+        }
+        .header-sub {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 1px;
+        }
+        .backend-status {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .status-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--low-text);
+            box-shadow: 0 0 6px var(--low-text);
+            transition: background .3s, box-shadow .3s;
+        }
+        .status-dot.offline {
+            background: var(--muted);
+            box-shadow: none;
+        }
+
+        /* ── URL bar ───────────────────────────────────────── */
+        .url-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 14px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            font-size: 11.5px;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        .url-bar span { overflow: hidden; text-overflow: ellipsis; }
+        .url-bar .lock { flex-shrink: 0; }
+
+        /* ── Offline banner ────────────────────────────────── */
+        #offlineBanner {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: #1c1400;
+            border-bottom: 1px solid #5c4000;
+            color: #e3b341;
+            font-size: 12px;
+        }
+        #offlineBanner.show { display: flex; }
+
+        /* ── Main content ──────────────────────────────────── */
+        .content { padding: 14px; }
+
+        /* ── Loading state ─────────────────────────────────── */
+        #loadingState {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 28px 14px;
+            color: var(--muted);
+        }
+        .spinner {
+            width: 32px; height: 32px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Score card ────────────────────────────────────── */
+        #resultCard { display: none; }
+
+        .score-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            margin-bottom: 12px;
+            transition: border-color .3s;
+        }
+        .score-ring {
+            position: relative;
+            width: 64px; height: 64px;
+            flex-shrink: 0;
+        }
+        .score-ring svg { width: 64px; height: 64px; transform: rotate(-90deg); }
+        .score-ring .bg-circle { fill: none; stroke: var(--border); stroke-width: 5; }
+        .score-ring .fg-circle {
+            fill: none;
+            stroke-width: 5;
+            stroke-linecap: round;
+            stroke-dasharray: 163;
+            stroke-dashoffset: 163;
+            transition: stroke-dashoffset 1s ease, stroke .3s;
+        }
+        .score-value {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .score-meta { flex: 1; min-width: 0; }
+        .level-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .scan-time {
+            font-size: 11px;
+            color: var(--muted);
+        }
+        .scan-domain {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 3px;
+        }
+
+        /* level-specific colours */
+        .score-row.low    { border-color: var(--low);  background: var(--low-bg); }
+        .score-row.medium { border-color: var(--med);  background: var(--med-bg); }
+        .score-row.high   { border-color: var(--high); background: var(--high-bg); }
+        .score-row.critical {
+            border-color: var(--crit);
+            background: var(--crit-bg);
+            animation: critPulse 1.8s ease-in-out infinite;
+        }
+        @keyframes critPulse {
+            0%,100% { box-shadow: 0 0 0 0 rgba(158,30,30,.0); }
+            50%      { box-shadow: 0 0 12px 3px rgba(158,30,30,.55); }
+        }
+
+        .badge-low      { background: var(--low-bg);  color: var(--low-text);  border: 1px solid var(--low); }
+        .badge-medium   { background: var(--med-bg);  color: var(--med-text);  border: 1px solid var(--med); }
+        .badge-high     { background: var(--high-bg); color: var(--high-text); border: 1px solid var(--high); }
+        .badge-critical { background: var(--crit-bg); color: var(--crit-text); border: 1px solid var(--crit); }
+
+        .ring-low      { stroke: var(--low-text); }
+        .ring-medium   { stroke: var(--med-text); }
+        .ring-high     { stroke: var(--high-text); }
+        .ring-critical { stroke: var(--crit-text); }
+
+        /* ── Section headings ──────────────────────────────── */
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .7px;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        /* ── Indicator list ────────────────────────────────── */
+        .indicators-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+        .indicators-box ul { list-style: none; padding: 0; }
+        .indicators-box li {
+            padding: 4px 0;
+            border-bottom: 1px solid var(--border);
+            color: #e3b341;
+            display: flex;
+            gap: 7px;
+            font-size: 12px;
+        }
+        .indicators-box li:last-child { border-bottom: none; }
+        .indicators-box .safe-msg {
+            color: var(--low-text);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ── Page signals box ──────────────────────────────── */
+        .signals-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+        .signals-box li {
+            padding: 4px 0;
+            border-bottom: 1px solid var(--border);
+            color: #f85149;
+            display: flex;
+            gap: 7px;
+            font-size: 12px;
+        }
+        .signals-box li:last-child { border-bottom: none; }
+
+        /* ── Kill chain ────────────────────────────────────── */
+        .kill-chain-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+        .kc-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .kc-tag {
+            background: #1c2a3e;
+            border: 1px solid #264d7e;
+            color: #58a6ff;
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-size: 11px;
+        }
+
+        /* ── Action footer ─────────────────────────────────── */
+        .footer {
+            padding: 10px 14px 14px;
+            display: flex;
+            gap: 8px;
+        }
+        .btn {
+            flex: 1;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: inherit;
+            transition: all .15s;
+            text-align: center;
+        }
+        .btn-primary {
+            background: #1f6feb;
+            border-color: #388bfd;
+            color: #fff;
+        }
+        .btn-primary:hover { background: #388bfd; }
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+        }
+        .btn-secondary:hover { background: var(--border); }
+
+        /* ── Error state ───────────────────────────────────── */
+        #errorState {
+            display: none;
+            padding: 20px 14px;
+            text-align: center;
+            color: var(--high-text);
+        }
+        #errorState .err-icon { font-size: 28px; margin-bottom: 8px; }
+        #errorState p { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────── -->
+<div class="header">
+    <div class="header-logo">🛡️</div>
+    <div>
+        <div class="header-title">Phish Carnage</div>
+        <div class="header-sub">Real-Time Phishing Scanner</div>
+    </div>
+    <div class="backend-status" id="backendStatusWrap">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusLabel" style="color: #3fb950;">Live</span>
+    </div>
+</div>
+
+<!-- ── URL bar ─────────────────────────────────────────────────── -->
+<div class="url-bar">
+    <span class="lock" id="urlLock">🔒</span>
+    <span id="currentUrl">Loading…</span>
+</div>
+
+<!-- ── Offline banner ──────────────────────────────────────────── -->
+<div id="offlineBanner">
+    ⚠️ <strong>Backend offline</strong> — Start the Flask server at <code>127.0.0.1:5000</code>
+</div>
+
+<!-- ── Main content area ───────────────────────────────────────── -->
+<div class="content">
+
+    <!-- Loading -->
+    <div id="loadingState">
+        <div class="spinner"></div>
+        <span>Scanning URL…</span>
+    </div>
+
+    <!-- Error -->
+    <div id="errorState">
+        <div class="err-icon">❌</div>
+        <strong id="errMsg">Scan failed</strong>
+        <p>Make sure the Flask server is running at<br><code style="color:var(--accent)">http://127.0.0.1:5000</code></p>
+    </div>
+
+    <!-- Result card -->
+    <div id="resultCard">
+        <!-- Score row -->
+        <div class="score-row" id="scoreRow">
+            <div class="score-ring">
+                <svg viewBox="0 0 64 64">
+                    <circle class="bg-circle" cx="32" cy="32" r="26"/>
+                    <circle class="fg-circle" id="ringCircle" cx="32" cy="32" r="26"/>
+                </svg>
+                <div class="score-value" id="scoreValue">0</div>
+            </div>
+            <div class="score-meta">
+                <div class="level-badge" id="levelBadge">LOW</div>
+                <div class="scan-domain" id="scanDomain"></div>
+                <div class="scan-time" id="scanTime">–</div>
+            </div>
+        </div>
+
+        <!-- URL Indicators -->
+        <div class="indicators-box">
+            <div class="section-title">URL Indicators</div>
+            <div id="indicatorList"></div>
+        </div>
+
+        <!-- Page Signals (only shown if present) -->
+        <div id="pageSignalsWrap" style="display:none">
+            <div class="signals-box">
+                <div class="section-title">⚠️ Page-Level Signals</div>
+                <ul id="signalList"></ul>
+            </div>
+        </div>
+
+        <!-- Kill Chain -->
+        <div id="killChainWrap" style="display:none">
+            <div class="kill-chain-box">
+                <div class="section-title">🔗 Kill Chain Techniques</div>
+                <div class="kc-tags" id="kcTags"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Footer buttons ──────────────────────────────────────────── -->
+<div class="footer">
+    <button class="btn btn-primary" id="scanButton">🔄 Re-Scan</button>
+    <button class="btn btn-secondary" id="dashboardButton">📊 Dashboard</button>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
