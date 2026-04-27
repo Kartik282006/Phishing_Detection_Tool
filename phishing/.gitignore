@@ -1,0 +1,42 @@
+# ── Python ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environments ──────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Environment & secrets ─────────────────────────────────────────────
+.env
+.env.local
+.env.production
+
+# ── Local SQLite database (not used in production) ────────────────────
+database.db
+*.sqlite3
+
+# ── Logs & debug files ────────────────────────────────────────────────
+*.log
+error_log.txt
+debug_output.txt
+model_test_log.txt
+test_result.txt
+
+# ── OS / editor artifacts ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.lnk
+.idea/
+.vscode/
+
+# ── Test / debug scripts ──────────────────────────────────────────────
+debug_gemini.py
+test_model.py
+test_models.py
+list_models.py
+available_models.txt
