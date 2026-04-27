@@ -562,7 +562,8 @@ td:last-child {
 }
 
 .chat-input-area .voice-btn.listening {
-    background: #ef4444; /* Red pulse */
+    background: #ef4444;
+    /* Red pulse */
     animation: pulse 1.5s infinite;
 }
 
@@ -570,9 +571,11 @@ td:last-child {
     0% {
         box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
     }
+
     70% {
         box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
     }
+
     100% {
         box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
     }

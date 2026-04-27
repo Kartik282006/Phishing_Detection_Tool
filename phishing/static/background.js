@@ -94,11 +94,11 @@
         );
 
         vec4 contribution = auroraColors
-          * exp(sin(i * i + iTime * 0.8))
-          / length(max(v, vec2(v.x * f * 0.015, v.y * 1.5)));
+          * 1.8
+          / (length(max(v, vec2(v.x * f * 0.015, v.y * 1.5))) + 0.4);
 
         float thinness = smoothstep(0.0, 1.0, i / 35.0) * 0.6;
-        o += contribution * (1.0 + tailNoise * 0.8) * thinness;
+        o += contribution * (1.0 + tailNoise * 0.4) * thinness;
       }
 
       o = tanh(pow(o / 100.0, vec4(1.6)));
